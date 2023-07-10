@@ -1,4 +1,5 @@
 from ..well_ordered import WellOrdered
+from .graph import stringify_node_linewise
 
 class TreeException(Exception):
     pass
@@ -93,7 +94,7 @@ class BinarySearchTree:
             return self._height(self)
 
     def __init__(self):
-        self.SENTINEL = self._Node(self, None, None, None, None)
+        self.SENTINEL = self._Node(self, None, None, None, None, None)
         self._root = None
         self._sz = 0
 
@@ -144,9 +145,6 @@ class BinarySearchTree:
     def root(self):
         return self._root
 
-    def insert(self, key, value):
-        self._insert_node(self._create_node(key, value))
-
     def get_pred(self, key):
         if len(self) <= 0:
             raise EmptyTreeException("Cannot find predecessor in empty tree")
@@ -161,25 +159,33 @@ class BinarySearchTree:
         except KeyError:
             return default
 
+    def _get_node(self, key):
+        prev, curr = self.SENTINEL, self.root
+        while curr is not self.SENTINEL and curr is not None:
+            prev = curr
+            curr = curr.get_child(key > curr.key)
+            if prev.key == key:
+                return prev
+
     def __setitem__(self, key, value):
-        try:
-            n = self.__getitem__(key)
+        n = self._get_node(key)
+        if n is not None:
             n.value = value
-        except KeyError:
-            self.insert(key, value)
+        else:
+            self._insert_node(self._create_node(key, value))
 
     def __len__(self):
         return self._sz
 
     def __contains__(self, key):
-        p = self._get_pred(key)
+        p = self._get_node(key)
         return p is not self.SENTINEL and p.key == key
 
     def __getitem__(self, key):
-        p = self._get_pred(key)
-        if p is self.SENTINEL or p.key != key:
+        p = self._get_node(key)
+        if p is None:
             raise KeyError(f"Key {key} not found")
-        return p
+        return p.value
 
 class RedBlackTree(BinarySearchTree):
     class _Node(BinarySearchTree._Node):
@@ -205,10 +211,10 @@ class RedBlackTree(BinarySearchTree):
 
     def __init__(self):
         super().__init__()
-        self._root = None
+        self.SENTINEL.color_black()
 
-    def insert(self, key, value):
-        super()._insert_node(node := (self._create_node(key, value)))
+    def _insert_node(self, node):
+        super()._insert_node(node)
         self._recolor(node)
 
     def _recolor(self, node):

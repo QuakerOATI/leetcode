@@ -2,19 +2,29 @@ from ..trees.bst import RedBlackTree
 from ..graph import graph
 from ..trees.graph import stringify_node_linewise
 from math import log2
+from random import randint, choice
+from ..test import test_assert
 
-def test_rbtree(N, print_graph=True):
+def test_rbtree(num_inserts=500, keys=range(1000), values=range(1000), print_graph=False):
     t = RedBlackTree()
-    for x in range(N):
-        t.insert(x)
-        assert isinstance(t.root, t._Node)
-        assert not t.root.isred
-        assert len(t) == x + 1
+    d = {}
+    for x in range(num_inserts):
+        key, val = choice(keys), choice(values)
+        t[key] = val
+        d[key] = val
+        test_assert("RBTree t: class(t.root) == t._Node", isinstance, t.root, t._Node)
+        test_assert("RBTree t: t.root is black", lambda t: not t.root.isred, t)
+        test_assert("RBTree t: len(t) == {1} after insert", lambda _t, _x: len(_t) == _x, t, len(d))
+        test_assert("RBTree t: {1} in t after insert", lambda _t, _x: _x in _t, t, key)
+        test_assert("RBTree t: t[{1}] == {2} after insert", lambda _t, _k, _v: _t[_k] == _v, t, key, val)
+    for key, val in d.items():
+        test_assert("RBTree t: t[{1}] == {2} after all inserted", lambda _t, _k, _v: _t[_k] == _v, t, key, val)
     if print_graph:
         try:
             graph(t)
         except Exception as e:
             print(f"Exception while graphing: {e}")
+    is_rbtree(t)
     return t
 
 def is_rbtree(tree: RedBlackTree):

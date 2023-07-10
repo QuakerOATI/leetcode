@@ -82,3 +82,15 @@ Exception: {repr(exc_value)}
             }, loud=not quiet, quiet=quiet)
     return wrapper
 
+def test_assert(name, fn, *args, **kwargs):
+    fail_reason = None
+    try:
+        ret = fn(*args, **kwargs)
+        if not ret:
+            fail_reason = f"Expected Truthy, got {ret}"
+    except Exception as e:
+        fail_reason = f"Exception: {e}"
+    finally:
+        if fail_reason is not None:
+            print(f"{name.format(*args, **kwargs)}: {fail_reason}")
+
