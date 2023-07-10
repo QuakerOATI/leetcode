@@ -5,7 +5,10 @@ class Node:
 
 
 class Solution:
-    """Accepted, only beats about half the other solutions in runtime though"""
+    """Accepted, only beats about half the other solutions in runtime though
+
+    Very clever optimization: Add a dummy node at the head of the list to avoid the null checks
+    """
 
     def removeNthFromEnd(self, head, n):
         front, back = head, head
