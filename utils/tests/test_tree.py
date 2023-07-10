@@ -1,4 +1,6 @@
-from ..tree import RedBlackTree, graph, stringify_node_linewise
+from ..trees.bst import RedBlackTree
+from ..graph import graph
+from ..trees.graph import stringify_node_linewise
 from math import log2
 
 def test_rbtree(N, print_graph=True):
