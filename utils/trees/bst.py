@@ -155,8 +155,31 @@ class BinarySearchTree:
     def height(self):
         return self.root.height()
 
+    def get(self, key, default=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return default
+
+    def __setitem__(self, key, value):
+        try:
+            n = self.__getitem__(key)
+            n.value = value
+        except KeyError:
+            self.insert(key, value)
+
     def __len__(self):
         return self._sz
+
+    def __contains__(self, key):
+        p = self._get_pred(key)
+        return p is not self.SENTINEL and p.key == key
+
+    def __getitem__(self, key):
+        p = self._get_pred(key)
+        if p is self.SENTINEL or p.key != key:
+            raise KeyError(f"Key {key} not found")
+        return p
 
 class RedBlackTree(BinarySearchTree):
     class _Node(BinarySearchTree._Node):
