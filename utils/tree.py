@@ -1,6 +1,8 @@
 from .well_ordered import WellOrdered
 
 def _graph(obj):
+    if obj is None:
+        return repr(obj)
     if hasattr(obj, "__graph__"):
         if callable(obj.__graph__):
             return obj.__graph__()
@@ -12,27 +14,41 @@ def _graph(obj):
 def graph(obj):
     print(_graph(obj))
 
+def stringify_node_linewise(node, stalklength=2, flat_char="_", min_width=3):
+    lines, pos = _stringify_node_linewise(node, stalklength, flat_char, min_width)
+    return lines
+
 def _stringify_node_linewise(node, stalklength=2, flat_char="_", min_width=3):
     from itertools import zip_longest
     if node is node._tree.SENTINEL or node is None:
-        return [_graph(node).center(min_width)]
+        g = _graph(node)
+        if len(g) % 2 == 0:
+            g += " "
+        return [g.center(min_width)], max(min_width//2 + 1, len(g)//2 + 1)
     else:
         root = _graph(node)
-        left, right = (_stringify_node_linewise(n, stalklength, flat_char, min_width)
-            for n in node._children)
-        w_left, w_right = len(left[0]), len(right[0])
+        l, r = [_stringify_node_linewise(n, stalklength, flat_char, min_width)
+            for n in node._children]
+        left, lpos = l
+        right, rpos = r
+        w_left, w_right = max(map(len, left)), max(map(len, right))
         w_tot = w_left + max(w_right, len(root)//2 + 1)
+        if w_tot % 2 == 0:
+            w_tot += 1
+        pos = w_left + 1
         if len(right) > len(left):
             left.extend(["".ljust(w_left) for _ in range(len(right) - len(left))])
-        root = root.center(2*w_left + 1).ljust(w_tot)
+        root = root.center(2*pos - 1).ljust(w_tot)
         stalk = ["|".rjust(w_left + 1).ljust(w_tot) for _ in range(stalklength)]
-        platform = flat_char.rjust(w_left//2 + 1).ljust(w_left, flat_char) \
+        platform = "".ljust(lpos).ljust(w_left, flat_char) \
             + "|" \
-            + flat_char.ljust(w_right//2 + 1, flat_char)
+            + "".ljust(rpos - 1, flat_char)
         platform = platform.ljust(w_tot)
-        branches = [("|".center(w_left + 1) + "|".center(w_right)).ljust(w_tot)
+        branches = [("|".rjust(lpos).ljust(w_left) + "|".rjust(rpos + 1)).ljust(w_tot)
             for _ in range(stalklength)]
-        return [root, *stalk, platform, *branches, *map(lambda pair: " ".join(pair).ljust(w_tot), zip_longest(left, right, fillvalue=""))]
+        return [root, *stalk, platform, *branches,
+                *map(lambda pair: " ".join([pair[0].ljust(w_left), pair[1].rjust(w_right)]).ljust(w_tot), 
+                     zip_longest(left, right, fillvalue=""))], pos
 
 class TreeException(Exception):
     pass
@@ -44,23 +60,23 @@ class BinarySearchTree:
     class _Node(WellOrdered):
         def __init__(self, tree, value, parent, left, right):
             self._tree = tree
-            self._value = value
-            self._parent = parent
+            self.value = value
+            self.parent = parent
             self._children = [left, right]
 
         def __repr__(self):
             if self is self._tree.SENTINEL:
                 return f"{self.__class__}:SENTINEL"
             else:
-                return f"[{self.__class__}:{self._value}]" + ":" + "".join([f"({repr(c)})" for c in self._children])
+                return f"[{self.__class__}:{self.value}]" + ":" + "".join([f"({repr(c)})" for c in self._children])
 
         def __graph__(self, stalklength=2, flat_char="_"):
             if self is self._tree.SENTINEL:
                 return "*"
-            return f"({self._value})"
+            return f"({self.value})"
 
         def __eq__(self, other):
-            return self._tree is other._tree and self._value == other._value
+            return self._tree is other._tree and self.value == other.value
 
         def __lt__(self, other):
             if self._tree is not other._tree:
@@ -70,7 +86,7 @@ class BinarySearchTree:
             elif other is self._tree.SENTINEL:
                 return False
             else:
-                return self._value < other._value
+                return self.value < other.value
 
         def _checktype(self, *others):
             for other in others:
@@ -95,16 +111,16 @@ class BinarySearchTree:
             ret = self.get_child(idx)
             self._children[self._get_index(idx)] = node
             if node is not self._tree.SENTINEL:
-                node._parent = self
+                node.parent = self
             return ret
 
         @property
         def birthday(self):
             if self is self._tree.SENTINEL:
                 return -1
-            # Can't use self._parent._children.index(self) because of _Node.__eq__ implementation
+            # Can't use self.parent._children.index(self) because of _Node.__eq__ implementation
             for b in 0, 1:
-                if self is self._parent._children[b]:
+                if self is self.parent._children[b]:
                     return b
 
         @property
@@ -114,6 +130,16 @@ class BinarySearchTree:
         @property
         def right(self):
             return self.get_child(1)
+
+        @classmethod
+        def _height(cls, node):
+            if node is node._tree.SENTINEL:
+                return 0
+            else:
+                return max(map(cls.height, node._children)) + 1
+
+        def height(self):
+            return self._height(self)
 
     def __init__(self):
         self.SENTINEL = self._Node(self, None, None, None, None)
@@ -126,7 +152,7 @@ class BinarySearchTree:
     def __graph__(self, stalklength=2, flat_char="_", min_width=3):
         if len(self) == 0:
             return "<Empty>"
-        return "\n".join(_stringify_node_linewise(self.root, stalklength, flat_char, min_width))
+        return "\n".join(stringify_node_linewise(self.root, stalklength, flat_char, min_width))
 
     def _create_node(self, value):
         return self._Node(self, value, self.SENTINEL, self.SENTINEL, self.SENTINEL)
@@ -136,7 +162,7 @@ class BinarySearchTree:
         if c is self.SENTINEL:
             raise TreeException("Cannot rotate at leaf node")
         # node.set_child(idx-1, c.get_child(idx))
-        (p := node._parent).replace_child(node, c)
+        (p := node.parent).replace_child(node, c)
         orphan = c.set_child(idx, node)
         node.set_child(idx-1, orphan)
         if p is self.SENTINEL:
@@ -152,12 +178,12 @@ class BinarySearchTree:
         prev, curr = self.SENTINEL, self.root
         while curr is not self.SENTINEL and curr is not None:
             prev = curr
-            curr = curr.get_child(value > curr._value)
+            curr = curr.get_child(value > curr.value)
         return prev
 
     def _insert_node(self, node):
         self.SENTINEL._checktype(node)
-        p = self._get_pred(node._value)
+        p = self._get_pred(node.value)
         p.set_child(node > p, node)
         if p is self.SENTINEL:
             self._root = node
@@ -174,6 +200,9 @@ class BinarySearchTree:
         if len(self) <= 0:
             raise EmptyTreeException("Cannot find predecessor in empty tree")
         return self._get_pred(value)
+
+    def height(self):
+        return self.root.height()
 
     def __len__(self):
         return self._sz
@@ -214,9 +243,9 @@ class RedBlackTree(BinarySearchTree):
         if node is self.root:
             node.color_black()
             return
-        while node._parent.isred:
-            pbd = (p := node._parent).birthday
-            uncle = (pp := p._parent).get_child(pbd - 1)
+        while node.parent.isred:
+            pbd = (p := node.parent).birthday
+            uncle = (pp := p.parent).get_child(pbd - 1)
             if uncle.isred:
                 p.color_black()
                 uncle.color_black()
@@ -225,12 +254,12 @@ class RedBlackTree(BinarySearchTree):
             else:
                 # The loop is guaranteed to terminate in this case
                 if node.birthday != pbd:
-                    # Rotate node into node._parent and set node --> node._parent
+                    # Rotate node into node.parent and set node --> node.parent
                     # This way, we ensure that node.birthday == pbd, falling into the last case
                     node = p
                     self._rotate(node, pbd)
-                # Note: node._parent may not be the same as p here, but pp is guaranteed to be the same
-                (p := node._parent).color_black()
+                # Note: node.parent may not be the same as p here, but pp is guaranteed to be the same
+                (p := node.parent).color_black()
                 pp.color_red()
                 self._rotate(pp, pbd-1)
         self.root.color_black()
