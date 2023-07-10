@@ -8,8 +8,9 @@ class EmptyTreeException(TreeException):
 
 class BinarySearchTree:
     class _Node(WellOrdered):
-        def __init__(self, tree, value, parent, left, right):
+        def __init__(self, tree, key, value, parent, left, right):
             self._tree = tree
+            self.key = key
             self.value = value
             self.parent = parent
             self._children = [left, right]
@@ -18,15 +19,15 @@ class BinarySearchTree:
             if self is self._tree.SENTINEL:
                 return f"{self.__class__}:SENTINEL"
             else:
-                return f"[{self.__class__}:{self.value}]" + ":" + "".join([f"({repr(c)})" for c in self._children])
+                return f"<{self.__class__}>[{self.key}:{self.value}]" + ":" + "".join([f"({repr(c)})" for c in self._children])
 
         def __graph__(self, stalklength=2, flat_char="_"):
             if self is self._tree.SENTINEL:
                 return "*"
-            return f"({self.value})"
+            return f"({self.key}:{self.value})"
 
         def __eq__(self, other):
-            return self._tree is other._tree and self.value == other.value
+            return self._tree is other._tree and self.key == other.key
 
         def __lt__(self, other):
             if self._tree is not other._tree:
@@ -36,7 +37,7 @@ class BinarySearchTree:
             elif other is self._tree.SENTINEL:
                 return False
             else:
-                return self.value < other.value
+                return self.key < other.key
 
         def _checktype(self, *others):
             for other in others:
@@ -104,8 +105,8 @@ class BinarySearchTree:
             return "<Empty>"
         return "\n".join(stringify_node_linewise(self.root, stalklength, flat_char, min_width))
 
-    def _create_node(self, value):
-        return self._Node(self, value, self.SENTINEL, self.SENTINEL, self.SENTINEL)
+    def _create_node(self, key, value):
+        return self._Node(self, key, value, self.SENTINEL, self.SENTINEL, self.SENTINEL)
 
     def _rotate(self, node, idx):
         c = node.get_child(idx-1)
@@ -124,16 +125,16 @@ class BinarySearchTree:
     def rotate_right(self, node):
         self._rotate(node, 1)
 
-    def _get_pred(self, value):
+    def _get_pred(self, key):
         prev, curr = self.SENTINEL, self.root
         while curr is not self.SENTINEL and curr is not None:
             prev = curr
-            curr = curr.get_child(value > curr.value)
+            curr = curr.get_child(key > curr.key)
         return prev
 
     def _insert_node(self, node):
         self.SENTINEL._checktype(node)
-        p = self._get_pred(node.value)
+        p = self._get_pred(node.key)
         p.set_child(node > p, node)
         if p is self.SENTINEL:
             self._root = node
@@ -143,13 +144,13 @@ class BinarySearchTree:
     def root(self):
         return self._root
 
-    def insert(self, value):
-        self._insert_node(self._create_node(value))
+    def insert(self, key, value):
+        self._insert_node(self._create_node(key, value))
 
-    def get_pred(self, value):
+    def get_pred(self, key):
         if len(self) <= 0:
             raise EmptyTreeException("Cannot find predecessor in empty tree")
-        return self._get_pred(value)
+        return self._get_pred(key)
 
     def height(self):
         return self.root.height()
@@ -183,9 +184,8 @@ class RedBlackTree(BinarySearchTree):
         super().__init__()
         self._root = None
 
-    def insert(self, value):
-        super()._insert_node(node := (self._create_node(value)))
-        assert isinstance(node, self._Node)
+    def insert(self, key, value):
+        super()._insert_node(node := (self._create_node(key, value)))
         self._recolor(node)
 
     def _recolor(self, node):
