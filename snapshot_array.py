@@ -1,30 +1,25 @@
 from bisect import bisect_right
 
 class SnapshotArray:
-    """TLE
-
-    ["SnapshotArray","set","snap","set","get"]
-    [[3],[0,5],[],[0,6],[0,0]]
-    [null,null,0,null,5]
-
-    ["SnapshotArray","set","snap","snap","set","set","get","get","get"]
-    [[3],[1,6],[],[],[1,19],[0,4],[2,1],[2,0],[0,1]]
-    [None,None,0,1,None,None,0,0,0]
+    """Accepted, but oh my God is it bad compared to other solutions
     """
     def __init__(self, length: int):
         self._snap_id = 0
-        self._array = [[(0, 0)]]
+        self._array = [[[0], [0]] for _ in range(length)]
 
     def set(self, index: int, val: int) -> None:
-        if self._array[index][-1][0] < self._snap_id:
-            self._array[index].append((self._snap_id, val))
+        snap, oldval = self._array[index][0][-1], self._array[index][1][-1]
+        if snap == self._snap_id:
+            self._array[index][1][-1] = val
         else:
-            self._array[index][-1] = (self._snap_id, val)
+            self._array[index][0].append(self._snap_id)
+            self._array[index][1].append(val)
 
     def snap(self) -> int:
         self._snap_id += 1
         return self._snap_id - 1
 
     def get(self, index: int, snap_id: int) -> int:
-        i = bisect_right(self._array[index], (self._snap_id, self._snap_id))
-        return self._array[index][i][1]
+        ids, vals = self._array[index]
+        j = max(bisect_right(ids, snap_id) - 1, 0)
+        return vals[j]
