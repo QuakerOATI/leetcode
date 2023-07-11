@@ -1,4 +1,4 @@
-from ..graph import *
+from ..graph import _graph
 
 def stringify_node_linewise(node, stalklength=2, flat_char="_", min_width=3):
     lines, pos = _stringify_node_linewise(node, stalklength, flat_char, min_width)
