@@ -6,8 +6,7 @@ from utils.testable import Testable
 class Solution(Testable):
     def __init__(self):
         super().__init__()
-        self.test_xs, self.test_ys = None, None
-        self.test_k = None
+        self.add_event("find_kth", self.find_kth)
 
     def findMedianSortedArrays(self, n1: List[int], n2: List[int]) -> float:
         """
@@ -43,12 +42,12 @@ class Solution(Testable):
         while True:
             # WLOG, rx - lx >= ry - ly
             if rx - lx < ry - ly:
-                self._talkif("Switching xs and ys", self.DEBUG)
+                # self._talkif("Switching xs and ys", self.DEBUG)
                 xs, ys = ys, xs
                 rx, ry, lx, ly = ry, rx, ly, lx
             # Base cases
             if rx == lx:
-                self._talkif(f"Base case: rx == lx == {rx}", self.DEBUG)
+                # self._talkif(f"Base case: rx == lx == {rx}", self.DEBUG)
                 if k > 0:
                     return max(xs[rx], ys[ry])
                 else:
@@ -67,18 +66,15 @@ class Solution(Testable):
             sz_left = split_x + split_y - lx - ly + 2
 
             if k >= sz_left:
-                lx = split_x + 1
-                ly = split_y + 1
+                lx = min(len(xs)-1, split_x + 1)
+                ly = min(len(ys)-1, split_y + 1)
                 k -= sz_left
             else:
                 rx = split_x
                 ry = split_y
 
     def generate_testcase(self):
-        self.test_xs = self._get_random_sorted_list(self.choice(self.test_sizes))
-        self.test_ys = self._get_random_sorted_list(self.choice(self.test_sizes))
-        self.test_k = self.choice(range(len(self.test_xs) + len(self.test_ys) - 1))
-        self.expected = sorted([*self.test_xs, *self.test_ys])[self.test_k]
-
-    def run_testcase(self):
-        self.result = self.find_kth(self.test_xs, self.test_ys, self.test_k)
+        xs, ys = [self.get_random_sorted_list() for _ in range(2)]
+        k = self.choice(range(len(xs) + len(ys) - 1))
+        expected = sorted([*xs, *ys])[k]
+        return self.TestCase(args=[self, xs, ys, k], kwargs={}, expected=expected)
