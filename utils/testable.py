@@ -16,7 +16,11 @@ class TestGenerator:
         self._test_sizes = sizes
         return self
 
-    def _get_random_sorted_list(self, sz):
+    def get_random_sorted_list(self, elems=None, sizes=None, sz=None):
+        elems = elems if elems is not None else self._test_elems
+        sz = sz if sz is not None else self._test_sizes
+        if not isinstance(sz, int):
+            sz = self.choice(sz)
         nums = set()
         while len(nums) < sz:
             nums.add(self.choice(self._test_elems))
@@ -40,7 +44,7 @@ class Chatty:
         self._block_indents = []
         self._block_levels = []
         self._block_footers = []
-        self._block_trim = None
+        self._block_trim = []
         self._default_fence = "=" * self.COLUMNS
         self._default_trim = ["break", 10]
 
@@ -53,16 +57,17 @@ class Chatty:
     def _talk(self, msg, verbosity, indentLevel, trimRight="break 10"):
         if self._verbosity < verbosity:
             return
-        if trimRight is not None:
-            trimRight = trimRight.lower().strip().split()
-            if trimRight[0] == "default":
-                trimRight = self._default_trim
+        if trimRight is None:
+            trimRight = self._block_trim[-1]
+        trimRight = trimRight.lower().strip().split()
+        if trimRight[0] == "default":
+            trimRight = self._default_trim
         try:
             max_lines = int(trimRight)[1]
         except (IndexError, ValueError, TypeError):
             max_lines = -1
         trimRight = trimRight[0]
-        indent = "".ljust(indentLevel)
+        indent = self._getRequestedIndent(indent)
         width = self.COLUMNS - indentLevel
         if len(msg) > width:
             if trimRight in ["break", "lb", "lines", "paragraph"]:
@@ -78,9 +83,9 @@ class Chatty:
                 print(indent + msg[:width])
         print(indent + msg)
 
-    def _talkif(self, msg, verbosity, indentLevel, condition=None, trimRight="default"):
+    def _talkif(self, msg, verbosity, indentLevel, condition=None, trimRight=None):
         if condition is None or condition:
-            self._talk(msg, verbosity, indentLevel)
+            self._talk(msg, verbosity, indentLevel, trimRight=trimRight)
 
     def _getRequestedIndent(self, indent):
         indent = indent.lower().strip()
@@ -96,29 +101,33 @@ class Chatty:
     def _print_fence(self, fence):
         if fence is None:
             return
-        self.print(fence * self.COLUMNS, trimRight="slice")
+        self.print(fence * self.width, trimRight="slice")
 
     @classmethod
     def _get_terminal_dims(cls):
         cls.COLUMNS, cls.LINES = cls.get_terminal_size()
 
+    @property
+    def width(self):
+        return self.COLUMNS - self._getIndentLevel()
+
     def volume(self, level):
         self._verbosity = level
         return self
 
-    def trim(self, trimRight):
+    def withTrim(self, trimRight):
         self._default_trim = trimRight.trim().lower().split()
         return self
 
-    def printDebug(self, msg, condition=None, indent="block", trimRight="default"):
+    def printDebug(self, msg, condition=None, indent="block", trimRight=None):
         self._talkif(
-            msg, self.DEBUG, self._getRequestedIndent(indent), condition=condition
+            msg, self.DEBUG, indent, condition=condition, trimRight=trimRight
         )
         return self
 
-    def printTest(self, msg, condition=None, indent="block", trimRight="default"):
+    def printTest(self, msg, condition=None, indent="block", trimRight=None):
         self._talkif(
-            msg, self.TEST, self._getRequestedIndent(indent), condition=condition
+            msg, self.TEST, indent, condition=condition, trimRight=trimRight
         )
         return self
 
@@ -141,6 +150,7 @@ class Chatty:
             self.print(footer, condition=footer is not None)
             self._block_levels.pop()
             self._block_indents.pop()
+            self._block_trim.pop()
         return self
 
     def endBlock(self, idx=-1, footer=None):
@@ -187,7 +197,7 @@ class Chatty:
 class Timeable:
     """Mixin to provide basic benchmarking facilities."""
 
-    from time import time
+    from time import time as now
 
     class Timer:
         def __init__(self, owner):
@@ -258,7 +268,7 @@ class Checkable:
 
     from .timeout import signal_timer
 
-    class CheckException:
+    class CheckException(Exception):
         pass
 
     results = {}
@@ -266,7 +276,7 @@ class Checkable:
     cases = {}
     checkers = {}
 
-    TestCase = namedtuple("TestCase", ["args", "kwargs", "expected"], defaults=[None])
+    TestCase = namedtuple("TestCase", ["args", "kwargs", "expected"], defaults=[[], {}, None])
     TestResult = namedtuple(
         "TestResult",
         ["name", "testcase", "returned", "status", "exception"],
@@ -277,12 +287,15 @@ class Checkable:
         super().__init__(*args, **kwargs)
 
     @classmethod
-    def _insert_expectations(cls, testcase, event_name, args, kwargs):
+    def _insert_expectations(cls, testcase, event_name):
         expectations = {
-            name: fn(*args, **kwargs)
-            for name, fn in cls.checkers.get(event_name, {}).items()
+            item[0]: item[1](*testcase.args, **testcase.kwargs)
+            for item in cls.checkers.get(event_name, {}).items()
         }
-        expectations |= {"GIVEN": testcase.expected}
+        if isinstance(testcase.expected, dict):
+            expectations = testcase.expected | expectations
+        else:
+            expectations |= {"GIVEN": testcase.expected}
         return cls.TestCase(**testcase, expected=expectations)
 
     @classmethod
@@ -298,15 +311,12 @@ class Checkable:
         cls.events[event_name].append(func)
 
     @classmethod
-    def expect(cls, event_name, result, args=[], kwargs={}):
+    def add_testcases(cls, event_name, *testcases):
         cls.cases.setdefault(event_name, [])
-        cls.cases[event_name].append(
-            cls.TestCase(args=args, kwargs=kwargs, expected=result)
-        )
-        return cls
+        cls.cases[event_name].extend(testcases)
 
     @classmethod
-    def check_testcase(cls, event_name, testcase, use_checkers=True):
+    def check_testcase(cls, event_name, testcase, use_checkers=False, reuse=True):
         cls.results.setdefault(event_name, [])
         if use_checkers:
             try:
@@ -316,8 +326,9 @@ class Checkable:
                     f"Exception caught while generating expectations for event {event_name}: {e}"
                 )
         try:
-            cls.cases.setdefault(event_name, {})
-            cls.cases[event_name][testcase.args] = testcase
+            if reuse:
+                cls.cases.setdefault(event_name, [])
+                cls.cases[event_name].append(testcase)
             ret = cls.events[event_name](*testcase.args, **testcase.kwargs)
             status = None
             if testcase.expected is not None:
@@ -326,13 +337,13 @@ class Checkable:
                 event_name, testcase=case, returned=ret, status=status
             )
         except Exception as e:
-            return cls.TestResult(event_name, testcase=case, status=False, exception=e)
+            return cls.TestResult(event_name, testcase=testcase, status=False, exception=e)
 
     @classmethod
-    def check_all_testcases(cls, event_name, use_checkers=True):
+    def check_all_testcases(cls, event_name, use_checkers=False):
         try:
-            for c in cls.cases[event_name].values():
-                cls.check_testcase(event_name, c, use_checkers=use_checkers)
+            for c in cls.cases[event_name]:
+                cls.check_testcase(event_name, c, use_checkers=use_checkers, reuse=False)
         except KeyError:
             raise cls.CheckException(
                 f"Lookup error when checking tests for event {event_name}"
@@ -354,25 +365,21 @@ class Testable(TestGenerator, Chatty, Timeable, Checkable):
             self.startBlock(indent=2, fence=None).print(
                 f"{name.upper()}:        {predicted}"
             )
+        self.endBlock()
 
     def _print_testresult(self, result: Checkable.TestResult):
         self.endBlockScope(idx=0).startBlock().withTitle(f"{result.name} results")
         self.startBlock(indent=4, fence=None).withTitle("Status").print(
             result.status
         ).endBlock()
-        self.startBlock(indent=4, fence=None).withTitle("Expected").print(
-            result.expected
-        ).endBlock()
+        self._print_expectations(result.testcase.expected)
         self.startBlock(indent=4, fence=None).withTitle("Returned").print(
             result.returned
         ).endBlock()
         self.endBlockScope()
 
     def generate_testcase(self):
-        raise NotImplementedError
-
-    def run_testcase(self):
-        raise NotImplementedError
+        return NotImplemented
 
     def test(self):
         self.generate_testcase()
