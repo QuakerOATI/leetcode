@@ -1,5 +1,7 @@
 class PQueue {
-  constructor() {
+  static id = (x) => x;
+  constructor(keyfunc = PQueue.id) {
+    this.keyfunc = keyfunc;
     this._items = [];
   }
   get length() {
@@ -13,7 +15,7 @@ class PQueue {
       return;
     let p = Math.floor((idx - 1) / 2);
     let val = this._items[idx];
-    while (idx > 0 && val < this._items[p]) {
+    while (idx > 0 && this.keyfunc(val) < this.keyfunc(this._items[p])) {
       this._items[idx] = this._items[p];
       this._items[idx = p] = val;
       p = Math.floor((idx - 1) / 2);
@@ -28,8 +30,8 @@ class PQueue {
       children = [2 * idx + 1, 2 * idx + 2]
         .map(j => j >= this._items.length ? undefined : [j, this._items[j]])
         .filter(x => x !== undefined)
-        .sort((x, y) => x[1] - y[1]);
-      if (children.length && val > children[0][1]) {
+        .sort((x, y) => this.keyfunc(x[1]) - this.keyfunc(y[1]));
+      if (children.length && this.keyfunc(val) > this.keyfunc(children[0][1])) {
         this._items[idx] = children[0][1];
         this._items[idx = children[0][0]] = val;
       } else {
@@ -59,5 +61,3 @@ class PQueue {
     }
   }
 }
-
-export { PQueue };
