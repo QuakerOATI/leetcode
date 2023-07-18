@@ -18,31 +18,33 @@ class LinkedList {
   toString() {
     let seen = new Set();
     let curr = this;
-    let ret = "";
+    let ret = this.val.toString();
     let loop = false;
     let numNodes = 0;
-    while (curr && !loop && numNodes < this.MAX_PRINTED_ELEMS) {
+    while (curr && !loop && numNodes < LinkedList.MAX_PRINTED_ELEMS) {
       curr = curr?.next;
+      if (!curr)
+        break;
       if (seen.has(curr)) {
         loop = true;
       } else {
         seen.add(curr);
-        ret += ` -> ${curr.val}`;
+        ret += ` -> ${curr?.val}`;
       }
       numNodes += 1;
     }
     if (loop) {
-      ret += ` -> ( ${curr.val}`;
-      for (let n = curr.next; n !== curr; n = n.next) {
-        ret += ` -> ${n.val}`;
+      ret += ` -> ( ${curr?.val}`;
+      for (let n = curr?.next; !n || n !== curr; n = n?.next) {
+        ret += ` -> ${n?.val}`;
       }
       ret += " )*";
     }
-    if (numNodes >= MAX_PRINTED_ELEMS) {
+    if (numNodes >= LinkedList.MAX_PRINTED_ELEMS) {
       ret += "..."
     }
     return ret
   }
 }
 
-export { range, randInt, randArr, ListNode, LinkedList };
+return { range, randInt, randArr, ListNode, LinkedList };
