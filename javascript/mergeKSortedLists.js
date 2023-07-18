@@ -11,23 +11,57 @@ import { range, LinkedList, LinkedListNode, randArr, randInt } from './utils.js'
  * @param {ListNode[]} lists
  * @return {ListNode}
  */
+
 var mergeKLists = function (lists) {
-  q = new PQueue(x => x.val);
-  while (lists.length) {
-    lists.filter(l => l)
-    lists.forEach(l => {
-      q.insert(l);
-      l = l?.next;
-    })
+  if (!lists.length) {
+    return null;  // null represents empty linked list
   }
-};
+  let q = new PQueue(x => x.val);
+  let dummy = { next: null };
+  let tail = dummy;
+  lists.filter(x => x).forEach(l => { q.insert(l); });
+  while (q.length) {
+    tail.next = q.removeMin();
+    tail = tail.next;
+    if (tail.next)
+      q.insert(tail.next);
+  }
+  return dummy.next;
+}
+
 
 var randomTestcase = function (numLists = 50, maxSize = 100, maxElem = 1000) {
-  arrs = range(1, numLists).map(_ => randArr(randInt(1, maxSize), -maxElem, maxElem).sort());
-  ans = arrs.reduce((tot, arr) => tot.concat(arr), []).sort();
+  let comp = (x, y) => parseInt(x) - parseInt(y);
+  arrs = range(1, numLists).map(_ => randArr(randInt(1, maxSize), -maxElem, maxElem).sort(comp));
+  ans = arrs.reduce((tot, arr) => tot.concat(arr), []).sort(comp);
   lists = arrs.map(LinkedList.fromArray);
   return { args: lists, sorted: ans };
 };
+
+var doTestcase = function (tc) {
+  console.time("testcase");
+  let ll = mergeKLists(tc.args);
+  let curr = ll;
+  console.timeEnd("testcase");
+  for (let idx = 0; idx < tc.sorted.length; idx++) {
+    if (!curr) {
+      console.log(`Dude, your linked list ended at index ${idx} out of ${tc.sorted.length - 1}`);
+      console.log(ll.toString())
+      console.log(tc.sorted)
+      return false;
+    }
+    if (curr.val !== tc.sorted[idx]) {
+      console.log(`Oh noes, failed at index ${idx}`);
+      console.log(`            curr.val = ${curr.val}`);
+      console.log(`    tc.sorted[idx] = ${tc.sorted[idx]}`);
+      console.log(ll.toString())
+      console.log(tc.sorted)
+      return false;
+    }
+    curr = curr.next;
+  }
+  return true;
+}
 
 class PQueue {
   static id = (x) => x;
@@ -62,7 +96,7 @@ class PQueue {
         .map(j => j >= this._items.length ? undefined : [j, this._items[j]])
         .filter(x => x !== undefined)
         .sort((x, y) => this.keyfunc(x[1]) - this.keyfunc(y[1]));
-      if (children.length && val > children[0][1]) {
+      if (children.length && this.keyfunc(val) > this.keyfunc(children[0][1])) {
         this._items[idx] = children[0][1];
         this._items[idx = children[0][0]] = val;
       } else {
