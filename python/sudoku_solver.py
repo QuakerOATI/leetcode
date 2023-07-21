@@ -278,7 +278,7 @@ class Sudoku:
         for i, row in enumerate(mat):
             for j, elem in enumerate(row):
                 try:
-                    self._matrix.choose_row(((i, j, int(elem))))
+                    self._matrix.choose_row(((i + 1, j + 1), int(elem)))
                 except ValueError:
                     continue
 
@@ -333,3 +333,24 @@ class Sudoku:
     def solve(self):
         self._matrix.solve()
         self._apply_solution(self._matrix.solution)
+
+
+class Solution:
+
+    def solveSudoku(self, board: List[List[str]]) -> None:
+        """
+        Do not return anything, modify board in-place instead.
+        """
+        matrix = SudokuConstraintMatrix()
+        for i, row in enumerate(board):
+            for j, elem in enumerate(row):
+                try:
+                    matrix.choose_row(((i + 1, j + 1), int(elem)))
+                except ValueError:
+                    continue
+        matrix.solve()
+        self._apply_solution(matrix.solution, board)
+
+    def _apply_solution(self, kv_pairs, board):
+        for pos, val in kv_pairs:
+            board[pos[0] - 1][pos[1] - 1] = str(val)
