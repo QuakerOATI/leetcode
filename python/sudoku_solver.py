@@ -11,6 +11,12 @@ class LinkedTorusNode:
         self.right = right if right is not None else self
         self.left = left if left is not None else self
 
+    def is_excised_lateral(self):
+        return self.left.right is not self or self.right.left is not self
+
+    def is_excised_vertical(self):
+        return self.up.down is not self or self.down.up is not self
+
     def excise_lateral(self):
         self.left.right = self.right
         self.right.left = self.left
@@ -181,8 +187,9 @@ class ConstraintMatrix:
         del self._rows[row]
 
     def _recurse(self):
-        # Raises StopIteration if min_column is empty
-        self._solution.append(self.get_min_column().randomized())
+        if self._solution[-1].header.is_excised_lateral():
+            # Raises StopIteration if min_column is empty
+            self._solution.append(self.get_min_column().randomized())
         self._remove_conflicts(next(self._solution[-1]))
 
     def _backtrack(self):
@@ -306,7 +313,7 @@ class Sudoku:
     def verify(cls, board):
         # rows
         for i in range(9):
-            if len(board[i]) != len(set(board[i])):
+            if len(filter(str.isnumeric, board[i])) != len(set(board[i])):
                 print(f"Repeat found in row {i}")
                 return False
 
