@@ -187,7 +187,8 @@ class ConstraintMatrix:
         del self._rows[row]
 
     def _recurse(self):
-        if self._solution[-1].header.is_excised_lateral():
+        if len(self._solution
+               ) == 0 or self._solution[-1]._header.is_excised_lateral():
             # Raises StopIteration if min_column is empty
             self._solution.append(self.get_min_column().randomized())
         self._remove_conflicts(next(self._solution[-1]))
