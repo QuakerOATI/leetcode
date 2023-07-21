@@ -4,6 +4,7 @@ class Solution:
     """
 
     def solveNQueens(self, n: int) -> List[List[str]]:
+        """Solution to N-Queens I"""
         board = [["." for _ in range(n)] for _ in range(n)]
         solutions = []
         rows = set()
@@ -41,3 +42,29 @@ class Solution:
         for row in soln:
             print("  ".join([c for c in row]))
             print()
+
+    def totalNQueens(self, n: int) -> int:
+        """Solution to N-Queens II"""
+        pos_diags = set()
+        neg_diags = set()
+        rows = set()
+        count = 0
+
+        def helper(n_col):
+            nonlocal count
+            if n_col == n:
+                count += 1
+                return
+            for n_row in range(n):
+                if n_row not in rows and (n_row - n_col) not in pos_diags and (
+                        n_row + n_col) not in neg_diags:
+                    rows.add(n_row)
+                    pos_diags.add(n_row - n_col)
+                    neg_diags.add(n_row + n_col)
+                    helper(n_col + 1)
+                    rows.remove(n_row)
+                    pos_diags.remove(n_row - n_col)
+                    neg_diags.remove(n_row + n_col)
+
+        helper(0)
+        return count
