@@ -6,19 +6,20 @@ import { ConstraintMatrix } from "./dancingLinks";
 
 var solveSudokuDancingLinks = function (board) {
   let chars = "123456789".split("");
-  matrix = ConstraintMatrix();
+  var matrix = new ConstraintMatrix();
   board.forEach((row, i) => {
     row.forEach((entry, j) => {
       if (entry === ".") {
         let box = i - (i % 3) + Math.floor(j / 3);
+        console.log(`Adding possibilities for row = ${i}, col = ${j}, box = ${box}`);
         chars.forEach(char => {
-          matrix.addPossibility({ apply: function (b) { b[i][j] = char; } },
+          matrix.addPossibility({ name: `R${i}C${j}IS${char}`, apply: function (b) { b[i][j] = char; } },
             [`ROW${i}COL${j}`, `R${i}HAS${char}`, `C${j}HAS${char}`, `B${box}HAS${char}`]);
         });
       }
     });
   });
-  for (possibility of matrix.solution()) {
+  for (possibility of matrix.solve()) {
     possibility.apply(board);
   }
 }

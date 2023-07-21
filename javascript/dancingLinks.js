@@ -13,142 +13,246 @@ var CircularListNodeFactory = function (...circularRefNames) {
 
 class ConstraintMatrix {
 
-  constructor(randomizationProbability = 0.3) {
+  constructor(randomizationProbability = 0.3, maxIterations = Infinity, maxAllowedDepth = Infinity) {
     // Used for nondeterministically choosing rows
     this.RANDOMIZATION_PROBABILITY = randomizationProbability;
-    this._solution = [];
-    this._rows = [];
-    this._columns = null;
+    this.solution = [];
+    this.rows = [];
+    this.columns = null;
+    this.maxAllowedDepth = maxAllowedDepth;
+    this.maxIterations = maxIterations;
+    this.maxDepth = -1;
+    this.numIterations = -1;
   }
 
   static ListNode = CircularListNodeFactory("left", "right", "up", "down", "header");
-  static Possibility = (id, [...constraints]) => { return { id, constraints, name: toString(id) } };
 
-  static _removeColumn(node) {
-    if (node?.left) node.left.right = node.right;
-    if (node?.right) node.right.left = node.left;
+  _removeCol(node) {
+    if (node?.left) node.left.right = node?.right;
+    if (node?.right) node.right.left = node?.left;
   }
 
-  static _removeRow(node) {
-    if (node?.up) node.up.down = node.down;
-    if (node?.down) node.down.up = node.up;
+  _removeRow(node) {
+    if (node?.up) node.up.down = node?.down;
+    if (node?.down) node.down.up = node?.up;
   }
 
-  static _restoreColumn(node) {
+  _restoreCol(node) {
     if (node?.left) node.left.right = node;
     if (node?.right) node.right.left = node;
   }
 
-  static _restoreRow(node) {
+  _restoreRow(node) {
     if (node?.up) node.up.down = node;
     if (node?.down) node.down.up = node;
   }
 
-  addConstraints(...ids) {
-    let node;
-    let right = this._columns;
-    for (let name of ids.map(toString).sort()) {
-      for (; right && right.name < name; right = right?.right) { }
-      this._restoreColumn(node = ConstraintMatrix.ListNode({
+  insertCol(name, searchStart = this.columns) {
+    let col;
+    if (!searchStart) {
+      col = ConstraintMatrix.ListNode({
         name,
-        right,
-        left: right?.left,
         count: 0
-      }));
-      this._columns = this._columns && this._columns.name <= node.name ? this._columns : node;
-      right = node;
+      });
+    } else {
+      let header = searchStart;
+      for (
+        ;
+        header.name < name && header.right.name > header.name;
+        header = header.right
+      ) { }
+      if (header.name === name) { return header; }
+      while (header.name > name && header.left.name < header.name) { header = header.left; }
+      col = ConstraintMatrix.ListNode({
+        name,
+        left: header,
+        right: header.right,
+        count: 0
+      });
     }
+    if (!this.columns || col.name < this.columns.name) { this.columns = col; }
+    col.left.right = col;
+    col.right.left = col;
+    return col;
   }
 
-  addPossibility(data, [...colIds]) {
-    let idx = this._rows.push(data) - 1;
-    let colHeader = this._columns;
-    let tail;
+  addPossibility(data, colIds) {
+    let idx = this.rows.push(data) - 1;
+    let searchStart = this.columns;
+    let prev;
+    let header;
     let node;
-    for (let colName of colIds.map(toString).sort()) {
-      for (; colHeader.name < colName; colHeader = colHeader.right) {
-        if (colHeader.name !== colName) {
-          colHeader = ConstraintMatrix.ListNode({
-            left: colHeader?.left,
-            right: colHeader?.right,
-            name: colName,
-            count: 0
-          });
-          this._restoreRow(colHeader);
-        }
-        node = ConstraintMatrix.ListNode({
-          left: tail,
-          right: tail?.right,
-          header: colHeader,
-          rowIdx: idx,
-          up: header.up,
-          down: header
-        });
-        this._restoreRow(node);
-        this._restoreColumn(node);
-        header.count++;
-      }
+    for (let id of colIds.sort()) {
+      header = this.insertCol(id, searchStart);
+      node = ConstraintMatrix.ListNode({
+        left: prev,
+        right: prev?.right,
+        up: header.up,
+        down: header,
+        rowIdx: idx,
+        header: header
+      });
+      // console.log(node);
+      node.left.right = node;
+      node.right.left = node;
+      node.up.down = node;
+      node.down.up = node;
+      prev = node;
+      header.count++;
     }
   }
 
-  *_getElemRowIterator(node) {
-    yield node;
-    for (let curr = node.right; curr !== node; curr = curr.right)
+  *iterateRow(node) {
+    if (node) yield node;
+    for (let curr = node?.right; curr && curr !== node; curr = curr?.right)
       yield curr;
   }
 
-  *_getElemColumnIterator(node) {
-    yield node;
-    for (let curr = node.down; curr !== node; curr = curr.down)
+  *iterateCol(node) {
+    node = node.header;
+    for (let curr = node?.down; curr && curr.down !== node; curr = curr?.down)
       yield curr;
   }
 
-  _getRandomColElem(col) {
-    for (let curr = col.head; Math.random() > this.RANDOMIZATION_PROBABILITY || curr === col.head; curr = curr.down) { }
+  getRandomColElem(col) {
+    let curr;
+    for (curr = col.header; Math.random() > this.RANDOMIZATION_PROBABILITY || curr === col.header; curr = curr.down) { }
     return curr
   }
 
-  _getNextColumn() {
-    let min = this._columns;
-    for (let header of this._getElemRowIterator(this._columns)) {
+  getNextCol() {
+    let min = this.columns;
+    for (let header of this.iterateRow(this.columns)) {
       min = min && min.count < header.count ? min : header;
     }
     return min;
   }
 
-  _backtrack() {
-    let node = this._solution.pop();
-    for (let colNode of this._getElemColumnIterator(node)) {
-      this._restoreRow(colNode);
-      for (let rowNode of this._getElemRowIterator(colNode)) {
-        this._restoreColumn(rowNode);
+  backtrack() {
+    let elem = this.solution.pop();
+    let node;
+    let colNode;
+    let rowNode;
+    for (colNode of this.iterateRow(elem)) {
+      colNode.header.left.right = colNode.header;
+      colNode.header.right.left = colNode.header;
+      if (!this.columns || this.columns.name > colNode.header.name)
+        this.columns = colNode.header;
+      for (rowNode of this.iterateCol(colNode)) {
+        for (node of this.iterateRow(rowNode)) {
+          node.up.down = node;
+          node.down.up = node;
+          node.header.count++;
+        }
       }
     }
   }
 
+  eliminateRow(elem) {
+    this.solution.push(elem);
+    let node;
+    let colNode;
+    let rowNode;
+    for (colNode of this.iterateRow(elem)) {
+      for (rowNode of this.iterateCol(colNode)) {
+        for (node of this.iterateRow(rowNode)) {
+          if (node !== rowNode) {
+            node.up.down = node.down;
+            node.down.up = node.up;
+            node.header.count--;
+          }
+        }
+      }
+      if (colNode.header === colNode.header.right) {
+        return true;
+      }
+      colNode.header.left.right = colNode.header.right;
+      colNode.header.right.left = colNode.header.left;
+      if (this.columns === colNode.header)
+        this.columns = colNode.header.right;
+    }
+    return false;
+  }
+
   solve() {
     // Solution to the exact cover problem represented by the Boolean constraint matrix using Knuth's "Dancing Links" algorithm
+    this.maxDepth = this.depth;
+    this.numIterations = 0;
     while (true) {
-      let col = this._getNextColumn();
+      if (this.maxIterations && ++this.numIterations > this.maxIterations) {
+        console.log(`Exceeded max number of iterations ${this.maxIterations}`)
+        break;
+      }
+      if (this.depth > this.maxDepth) {
+        this.maxDepth = this.depth;
+        console.log(`Reached depth ${this.depth} after ${this.numIterations} iterations`);
+      }
+      if (this.maxAllowedDepth && this.maxDepth >= this.maxAllowedDepth) {
+        console.log(`Max depth ${this.maxAllowedDepth} exceeded`);
+        break;
+      }
+      let col = this.getNextCol();
+      this.currentCol = col;
       if (col.up === col) {
-        // Empty column
-        if (col.right === col) {
-          console.log("Great success!  Dancing Links has yielded a solution to all your problems");
-          return this._solution.map(n => this._rows[n.rowIdx]);
-        } else {
-          this._backtrack();
-        }
+        this.backtrack();
       } else {
-        let elem = this._getRandomColElem(col);
-        this._solution.push(elem);
-        for (let rowNode of this._getElemRowIterator(elem)) {
-          for (let colNode of this._getElemColumnIterator(rowNode)) {
-            this._removeRow(colNode);
-          }
-          this._removeColumn(rowNode);
+        if (this.eliminateRow(this.getRandomColElem(col))) {
+          console.log("Solution found!  Booyah!");
+          return this.solution.map(n => this.rows[n.rowIdx]);
         }
       }
     }
+  }
+
+  reset() {
+    while (this.solution.length) this.backtrack();
+  }
+
+  *headers() {
+    yield this.columns;
+    for (let header = this.columns.right; header !== this.columns; header = header.right) {
+      yield header;
+    }
+  }
+
+  getColByName(name) {
+    for (let col of this.headers()) {
+      if (col.name === name)
+        return col;
+    }
+    console.log(`Sorry, no column with name ${name} was found`);
+  }
+
+  getRowData(row) {
+    return this.rows[row?.rowIdx];
+  }
+
+  getColSize(col) {
+    let cnt = 0;
+    for (let elem of this.iterateCol(col)) {
+      cnt++;
+    }
+    return cnt;
+  }
+
+  getRowSize(row) {
+    let cnt = 0;
+    for (let elem of this.iterateRow(row)) {
+      cnt++;
+    }
+    return cnt;
+  }
+
+  get numCols() {
+    if (!this.columns) return 0;
+    let numCols = 1;
+    for (let header = this.columns; header.right !== this.columns; header = header.right)
+      numCols++;
+    return numCols;
+  }
+
+  get depth() {
+    return this.solution.length;
   }
 }
 
