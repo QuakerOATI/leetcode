@@ -1,5 +1,5 @@
 from typing import Any, List
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 from random import uniform
 
 
@@ -59,6 +59,12 @@ class LinkedTorusNode:
 class ConstraintMatrix:
     """A sparse Boolean matrix for use in solving constraint problems."""
 
+    class NoSolution(Exception):
+        pass
+
+    class Solution(Exception):
+        pass
+
     class ConstraintMatrixElement(LinkedTorusNode):
 
         def __init__(self, header, row, **kwargs):
@@ -68,6 +74,9 @@ class ConstraintMatrix:
             self.visited = -1
 
     class ConstraintMatrixHeaderNode(LinkedTorusNode):
+
+        class EmptyColumn(Exception):
+            pass
 
         class RandomIterator:
 
@@ -114,7 +123,7 @@ class ConstraintMatrix:
 
         def randomized(self):
             if self.is_empty():
-                raise StopIteration
+                raise self.EmptyColumn
             self.num_random_traversals += 1
             return self.RandomIterator(self, self.num_random_traversals)
 
@@ -122,6 +131,8 @@ class ConstraintMatrix:
         self._rows = OrderedDict({r: None for r in rows})
         self._columns = None
         self._solution = []
+        self.maxdepth = 0
+        self.num_eliminations = 0
 
     def add_column(self, rows):
         header = self.ConstraintMatrixHeaderNode(
@@ -153,8 +164,9 @@ class ConstraintMatrix:
         for col in map(lambda n: n.header, node.equator()):
             for n in col:
                 for conflict in n.equator():
-                    conflict.header.count -= 1
-                    conflict.excise_vertical()
+                    if n is not conflict:
+                        conflict.header.count -= 1
+                        conflict.excise_vertical()
             if col is self._columns:
                 self._columns = col.right
             col.excise_lateral()
@@ -167,15 +179,20 @@ class ConstraintMatrix:
             col.restore_lateral()
             for n in reversed(col):
                 for conflict in n.equator(reversed=True):
-                    conflict.header.count += 1
-                    conflict.restore_vertical()
+                    if conflict is not n:
+                        conflict.header.count += 1
+                        conflict.restore_vertical()
             if self._columns is None:
                 self._columns = col
+
+    def get_num_columns(self):
+        """Traverses the header list and returns the number of column headers."""
+        return len(list(self._columns.equator()))
 
     def get_min_column(self):
         """Returns the column with the fewest links."""
         if self._columns is None:
-            raise StopIteration
+            raise self.Solution()
         ret = self._columns
         for header in self._columns.equator():
             ret = min(ret, header, key=lambda h: h.count)
@@ -184,39 +201,195 @@ class ConstraintMatrix:
     def choose_row(self, row):
         """Specify that a solution must contain a given row."""
         self._remove_conflicts(self._rows[row])
-        del self._rows[row]
+        # del self._rows[row]
+
+    def _pushcolumn(self):
+        # if len(self._solution
+        #        ) == 0 or self._solution[-1]._header.is_excised_lateral():
+        # Raises EmptyColumn if min_column is empty
+        self._solution.append(self.get_min_column().randomized())
+        self.maxdepth = max(self.maxdepth, len(self._solution))
+
+    def _pushrow(self):
+        self._remove_conflicts(next(self._solution[-1]))
+        self.num_eliminations += 1
+
+    def _popcolumn(self):
+        if self._solution[-1]._header.is_excised_lateral():
+            self._poprow()
+        self._solution.pop()
+
+    def _poprow(self):
+        self._restore_conflicts(self._solution[-1].curr)
 
     def _recurse(self):
-        if len(self._solution
-               ) == 0 or self._solution[-1]._header.is_excised_lateral():
-            # Raises StopIteration if min_column is empty
-            self._solution.append(self.get_min_column().randomized())
-        self._remove_conflicts(next(self._solution[-1]))
-
-    def _backtrack(self):
-        self._restore_conflicts(self._solution.pop().curr)
-        if len(self._solution) == 0:
-            raise StopIteration(
-                "Recursive algorithm completed without finding a solution")
+        if self.depth == 0:
+            raise self.NoSolution()
+        try:
+            if self._solution[-1]._header.is_excised_lateral():
+                # assert not self._solution[-1]._header.is_empty(
+                # ), "Inconsistent recursion state (empty column excised)"
+                self._pushcolumn()
+            else:
+                self._pushrow()
+                assert self._solution[-1]._header.is_excised_lateral(
+                ), "Inconsistent recursion state (top column not excised after pushrow)"
+        except self.ConstraintMatrixHeaderNode.EmptyColumn:
+            # Should only occur when we attempt to push an empty column
+            # Since columns are pushed deterministically, this means we should poprow()
+            self._poprow()
+            assert len(
+                self._solution
+            ) == 0 or not self._solution[-1]._header.is_excised_lateral(
+            ), "Inconsistent recursion state (top column excised after poprow)"
+        except StopIteration:
+            # Should only occur when the top randomized iterator finishes
+            self._popcolumn()
+            assert len(
+                self._solution
+            ) == 0 or self._solution[-1]._header.is_excised_lateral(
+            ), "Inconsistent recursion state (top column not excised after popcolumn)"
+            self._poprow()
 
     def is_empty(self):
         return self._columns is None
 
     def solve(self):
-        from timeit import default_timer
-        start = default_timer()
+        if self.is_empty():
+            return True
+        self._pushcolumn()
         while True:
             try:
                 self._recurse()
-            except StopIteration:
-                if self.is_empty():
-                    print(f"Solution found in {default_timer() - start}s")
-                    return True
-                self._backtrack()
+            except self.Solution:
+                return True
+            except self.NoSolution:
+                return False
+
+    @property
+    def depth(self):
+        return len(self._solution)
 
     @property
     def solution(self):
         return [it.curr.row for it in self._solution]
+
+    def get_column_counts(self):
+        c = Counter()
+        colnum = 0
+        for header in self._columns.equator():
+            colnum += 1
+            ct = 0
+            for n in header.meridian():
+                if n is not header:
+                    ct += 1
+            assert ct == header.count, f"Count inconsistent with column state at column {colnum}"
+            c[ct] += 1
+        return c
+
+    def take_snapshot(self):
+        self.snapshot = self.get_state()
+
+    def get_state(self):
+        return {
+            "depth": self.depth,
+            "is_empty": self.is_empty(),
+            "len(min_col)": self.get_min_column().count,
+            "num_eliminations": self.num_eliminations,
+            "column_counts": self.get_column_counts()
+        }
+
+    def audit(self):
+        self._pushcolumn()
+        while True:
+            self._recurse()
+            print(self.get_state())
+
+
+class SudokuConstraintMatrix(ConstraintMatrix):
+
+    def __init__(self):
+        super().__init__([((i, j), k) for i in range(1, 10)
+                          for j in range(1, 10) for k in range(1, 10)])
+        # uniqueness constraints
+        for i in range(1, 10):
+            for j in range(1, 10):
+                self.add_column([((i, j), k) for k in range(1, 10)])
+        # rows
+        for i in range(1, 10):
+            for k in range(1, 10):
+                self.add_column([((i, j), k) for j in range(1, 10)])
+        # columns
+        for j in range(1, 10):
+            for k in range(1, 10):
+                self.add_column([((i, j), k) for i in range(1, 10)])
+        # boxes
+        for bi in range(3):
+            for bj in range(3):
+                for k in range(1, 10):
+                    self.add_column([
+                        ((i, j), k)
+                        for i in range(3 * bi + 1, 3 * (bi + 1) + 1)
+                        for j in range(3 * bj + 1, 3 * (bj + 1) + 1)
+                    ])
+
+
+class Solution:
+
+    def solveSudoku(self, board: List[List[str]]) -> None:
+        """
+        Do not return anything, modify board in-place instead.
+        """
+        matrix = SudokuConstraintMatrix()
+        for i, row in enumerate(board):
+            for j, elem in enumerate(row):
+                try:
+                    matrix.choose_row(((i + 1, j + 1), int(elem)))
+                except ValueError:
+                    continue
+        matrix.solve()
+        self._apply_solution(matrix.solution, board)
+
+    def _apply_solution(self, kv_pairs, board):
+        for pos, val in kv_pairs:
+            board[pos[0] - 1][pos[1] - 1] = str(val)
+
+
+class TestSolution:
+    from timeit import default_timer as now
+
+    def __init__(self):
+        self.runtime = 0
+        self.matrix = None
+        self.board = None
+
+    def solveSudoku(self, board: List[List[str]]) -> None:
+        """
+        Do not return anything, modify board in-place instead.
+        """
+        self.matrix = SudokuConstraintMatrix()
+        self.board = [row.copy() for row in board]
+        start = self.now()
+        for i, row in enumerate(self.board):
+            for j, elem in enumerate(row):
+                try:
+                    print(f"Choosing element {(i+1, j+1, int(elem))}...")
+                    self.matrix.choose_row(((i + 1, j + 1), int(elem)))
+                    if self.matrix._columns is None:
+                        raise Exception(
+                            f"Choosing element {(i+1, j+1, int(elem))} abnormally emptied matrix"
+                        )
+                except ValueError:
+                    continue
+        try:
+            self.matrix.solve()
+            self._apply_solution(self.matrix.solution, self.board)
+        finally:
+            self.runtime = self.now() - start
+
+    def _apply_solution(self, kv_pairs, board):
+        for pos, val in kv_pairs:
+            board[pos[0] - 1][pos[1] - 1] = str(val)
 
 
 class HittingProblem:
@@ -247,34 +420,6 @@ class HittingProblem:
     def solve(self):
         self._matrix.solve()
         return self._matrix.solution
-
-
-class SudokuConstraintMatrix(ConstraintMatrix):
-
-    def __init__(self):
-        super().__init__([((i, j), k) for i in range(1, 10)
-                          for j in range(1, 10) for k in range(1, 10)])
-        # uniqueness constraints
-        for i in range(1, 10):
-            for j in range(1, 10):
-                self.add_column([((i, j), k) for k in range(1, 10)])
-        # rows
-        for i in range(1, 10):
-            for k in range(1, 10):
-                self.add_column([((i, j), k) for j in range(1, 10)])
-        # columns
-        for j in range(1, 10):
-            for k in range(1, 10):
-                self.add_column([((i, j), k) for i in range(1, 10)])
-        # boxes
-        for bi in range(3):
-            for bj in range(3):
-                for k in range(1, 10):
-                    self.add_column([
-                        ((i, j), k)
-                        for i in range(3 * bi + 1, 3 * (bi + 1) + 1)
-                        for j in range(3 * bj + 1, 3 * (bj + 1) + 1)
-                    ])
 
 
 class Sudoku:
@@ -314,7 +459,7 @@ class Sudoku:
     def verify(cls, board):
         # rows
         for i in range(9):
-            if len(filter(str.isnumeric, board[i])) != len(set(board[i])):
+            if len([*filter(str.isnumeric, board[i])]) != len(set(board[i])):
                 print(f"Repeat found in row {i}")
                 return False
 
@@ -341,24 +486,3 @@ class Sudoku:
     def solve(self):
         self._matrix.solve()
         self._apply_solution(self._matrix.solution)
-
-
-class Solution:
-
-    def solveSudoku(self, board: List[List[str]]) -> None:
-        """
-        Do not return anything, modify board in-place instead.
-        """
-        matrix = SudokuConstraintMatrix()
-        for i, row in enumerate(board):
-            for j, elem in enumerate(row):
-                try:
-                    matrix.choose_row(((i + 1, j + 1), int(elem)))
-                except ValueError:
-                    continue
-        matrix.solve()
-        self._apply_solution(matrix.solution, board)
-
-    def _apply_solution(self, kv_pairs, board):
-        for pos, val in kv_pairs:
-            board[pos[0] - 1][pos[1] - 1] = str(val)
