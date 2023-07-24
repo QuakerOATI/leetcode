@@ -4,6 +4,25 @@ from bisect import bisect_right
 
 class Solution:
 
+    def optimalSolution(self, target, nums):
+        """There is one key point here and one useful trick:
+        1. Once an optimal left-endpoint has been found for a given right-endpoint, all subsequent optimal left-endpoints must be equal to or to the right of it.
+        2. The use of float("inf") as a value which always compares greater than any other.
+        """
+        left = 0
+        curr_sum = 0
+        min_length = float('inf')
+
+        for right in range(len(nums)):
+            curr_sum += nums[right]
+
+            while curr_sum >= target:
+                min_length = min(min_length, right - left + 1)
+                curr_sum -= nums[left]
+                left += 1
+
+        return min_length if min_length != float('inf') else 0
+
     def minSubArrayLenBinarySearch(self, target, nums):
         """FINALLY accepted, but still kind of sucks"""
         if sum(nums) < target or len(nums) == 0:
