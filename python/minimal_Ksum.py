@@ -25,3 +25,21 @@ Accepted, but definitely not optimal (see appended optimal solution).
             l = max(0, L[-1])
             T += ((l + 1 + l + k) * k) // 2
         return T
+
+    def optimalKSum(self, nums, k):
+        """Takeaways:
+        1. Technique for getting a "sorted set" (i.e., remove duplicates and also order the elements)
+        2. Crux move: keep track of the sum of all array elements <= k as you iterate
+        """
+        nums = list(set(nums))
+        nums.sort()
+        last_term = k
+        removable_sum = 0
+        for num in nums:
+            if (num <= last_term):
+                last_term += 1
+                removable_sum += num
+            else:
+                break
+        somme = (last_term * (1 + last_term) / 2) - removable_sum
+        return int(somme)
