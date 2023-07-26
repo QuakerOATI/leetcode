@@ -123,7 +123,7 @@ var findInsertionPoint = function(arr, elem, cmp) {
     if (arr.length === 0 || cmp(elem, arr[0]) < 0)
         return [0, 0];
     else if (cmp(arr.at(-1), elem) < 0)
-        return [arr.length-1, arr.length-1];
+        return [arr.length, arr.length];
     let [l, r] = [0, arr.length-1];
     while (r-l > 1) {
         let m = Math.floor((r+l)/2);
