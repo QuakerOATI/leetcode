@@ -53,9 +53,14 @@ class Solution:
             return s[1:]
 
     def consume_starred(self, s, meta, is_starred=False):
+        if is_starred:
+            ...
         if len(s) == 0:
-            if self.starred is not None and self.starct
-            return self.TERMINAL
+            if is_starred:
+                return ""
+            elif self.match_char(meta, self.starred) and self.starct > 0:
+                self.starct -= 1
+                return ""
             else:
                 raise self.RegexError()
         if self.match_char(self.starred, s[0]):
