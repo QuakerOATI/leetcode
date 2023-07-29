@@ -2,23 +2,32 @@
  * @param {number} num
  * @return {string}
  */
-var intToRoman = function(num) {
-    let ans = [];
-    while (num) {
-        let next = Math.max(...Object.keys(numerals).filter(n => n <= num));
-        if (num/next >= 4) {
-            s += numerals
-        } else {
-            s += numerals[next];
-    
+// Accepted, but really inefficient
+// ~8 %ile
+var intToRoman = function (num) {
+  if (!num)
+    return "";
+  let ans = [];
+  while (num) {
+    let next = Math.max(...Object.keys(numerals).filter(n => n <= num));
+    num -= next;
+    ans.push(numerals[next]);
+  }
+  return ans.join("");
 };
 
 const numerals = {
-    1: "I",
-    5: "V",
-    10: "X",
-    50: "L",
-    100: "C",
-    500: "D",
-    1000: "M"
-}
+  1: "I",
+  4: "IV",
+  5: "V",
+  9: "IX",
+  10: "X",
+  40: "XL",
+  50: "L",
+  90: "XC",
+  100: "C",
+  400: "CD",
+  500: "D",
+  900: "CM",
+  1000: "M"
+};
