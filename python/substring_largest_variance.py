@@ -6,30 +6,28 @@ Given a string s consisting of lowercase English letters only, return the larges
 A substring is a contiguous sequence of characters within a string.
 
 """
-from itertools import combinations
+from string import ascii_lowercase
+from collections import Counter
 
 class Solution:
+    """
+    86.71 %ile runtime
+    31.55 %ile memory
+    """
     def largestVariance(self, s):
-        """TLE"""
-        S = set(s)
-        if len(S) < 2:
-            return 0
+        dp = Counter()
+        S = Counter()
         M = 0
-        for chars in combinations(S, 2):
-            count = [{c1: [[0, 0], [0, 0]] for c1 in chars}]
-            # ct[x][k][l] := maximal (#x - #y) for substrings ending at pos which contains at least k xs and l ys
-            for c in s:
-                if c not in chars:
+        for i, c1 in enumerate(s):
+            S[c1] += 1
+            for c2 in S:
+                if c1 == c2:
                     continue
-                prev = count[-1]
-                ct = {c1: [[0, 0], [0, 0]] for c1 in chars}
-                for x, y in zip(chars, reversed(chars)):
-                    if x == c:
-                        ct[x][0] = count[-1]
-                        ct[x][y] = count[-1][x][y] + 1
-                    else:
-                        ct[x][x] = max(count[-1][x][y] - 1, 0)
-                        ct[x][y] = count[-1][x][y] - 1
-                count.append(ct)
-                M = max(M, *[ct[x][x] for x in chars])
+                if (c1, c2) not in dp:
+                    dp[c1, c2] = (0, 1)
+                    dp[c2, c1] = (S[c2] - 1, 0)
+                else:
+                    dp[c2, c1] = (dp[c2, c1][0] + dp[c2, c1][1] - 1, 0)
+                    dp[c1, c2] = (max(0, dp[c1, c2][0] + 1), dp[c1, c2][1] if dp[c1, c2][0] >= 0 else 1)
+                M = max(M, dp[c1, c2][0], dp[c2, c1][0])
         return M
