@@ -14,118 +14,53 @@ A node u is an ancestor of another node v if u can reach v via a set of edges.
  * @return {number[][]}
  */
 var getAncestors = function(n, edges) {
-    // Choose node with no successors
-    // proof that there is such a node: if not, either there's a cycle or an infinite path
-    // Use DFS to get a list of its ancestors
-    // Reverse: start at a node with no predecessors
-    let cmp = (x, y) => x - y;
-    let stack = [];
+    // 86.36 %ile runtime
+    // 100.00 %ile memory
+    // A routine problem, but instructive in the dangers of overzealous optimization.
     var pred = Array.from({length: n}, () => []);
-    var adj = Array.from({length: n}, () => []);
-    for (let [a, b] of edges) {
+    var last = new Set(Array(n).keys());
+    for (let [a, b] of edges.sort((e1, e2) => e1[0] - e2[0])) {
         pred[b].push(a);
-        adj[a].push(b);
+        last.delete(a);
     }
-    for (let i=0; i<pred.length; ++i) {
-        if (pred[i].length === 0) {
-            preorderDfs(i, x => adj[x], x => {pred[
+    var traversed = new Set();
+    var dfs = function(node) {
+        if (traversed.has(node))
+            return;
+        let parents = [...pred[node]];
+        parents.forEach(p => dfs(p));
+        pred[node] = mergeSortedUnique(parents, ...parents.map(x => pred[x]));
+        traversed.add(node);
+    };
+    last.forEach(l => dfs(l));
+    return pred;
+}
+
+var mergeSortedUnique = function(...arrs) {
+    let js = Array(arrs.length).fill(0);
+    let ret = [];
+    let done = false;
+    while (!done) {
+        done = true;
+        let m = Infinity, j = -1;
+        for (let i=0; i<js.length; ++i) {
+            if (js[i] < arrs[i].length) {
+                done = false;
+                let elem = arrs[i][js[i]];
+                if (elem === ret.at(-1) || elem === m) {
+                    js[i]++;
+                    continue;
+                } else if (elem < m) {
+                    m = elem;
+                    j = i;
+                }
+            }
         }
-};
-
-var preorderBfs = function
-
-var preorderDfs = function*(node, getNext) {
-    if (!node)
-        return;
-    callback(
-    yield node;
-    yield* getNext(node).map(x => preorderDfs(x, getNext));
-}
-
-var upheap = function(arr, cmp, rootPos=0, heapEnd=-1) {
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    let pos = heapEnd;
-    let p;
-    for (p = getParent(arr, pos, rootPos);
-        p >= rootPos && cmp(arr[p], arr[pos]) > 0; 
-        [pos, p] = [p, getParent(arr, pos, rootPos)]) 
-    {
-        swap(arr, pos, p);
+        if (!done) {
+            ret.push(m);
+            js[j]++;
+        }
     }
-    return p;
-}
-
-var downheap = function(arr, pos, cmp, rootPos=0, heapEnd=-1) {
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    for (let c = getMinChild(arr, pos, cmp, rootPos, heapEnd); 
-        rootPos <= c && c <= heapEnd && arr[c] && cmp(arr[pos], arr[c]) > 0; 
-        [pos, c] = [c, getMinChild(arr, c, cmp, rootPos, heapEnd)]) 
-    {
-        swap(arr, pos, c);
-    }
-}
-
-var getParent = function(arr, pos, rootPos=0) {
-    return Math.floor((pos - rootPos - 1)/2);
-}
-
-var getMinChild = function(arr, pos, cmp, rootPos=0, heapEnd=-1) {
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    return [rootPos + 2*(pos-rootPos)+1, rootPos + 2*(pos-rootPos)+2]
-                            .filter(x => x >= rootPos && x <= heapEnd && arr[x])
-                            .sort((x, y) => cmp(arr[x], arr[y])).shift();
-}
-
-var heappop = function(arr, cmp, rootPos=0, heapEnd=-1) {
-    if (arr.length < 2)
-        return arr.pop();
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    console.log(rootPos, heapEnd);
-    var tail = arr.slice(heapEnd+1);
-    console.log(`tail = [${tail}]`);
-    arr = arr.slice(0, heapEnd+1);
-    swap(arr, rootPos, heapEnd);
-    let ret = arr.pop();
-    console.log(`arr (pre-concat) = [${arr}]`);
-    downheap(arr, cmp, rootPos);
-    arr = arr.concat(tail);
-    console.log(`arr (post-concat) = [${arr}]`);
     return ret;
 }
 
-var heappush = function(arr, elem, cmp, rootPos=0, heapEnd=-1) {
-    if (arr.length < 2) {
-        arr.push(elem);
-        arr.sort(cmp);
-        return;
-    }
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    var tail = arr.slice(heapEnd+1);
-    arr = arr.slice(0, heapEnd+1);
-    arr.push(elem);
-    let pos = upheap(arr, cmp, rootPos);
-    downheap(arr, pos, cmp, rootPos);
-    arr = arr.concat(tail);
-}
-
-var unheap = function(arr, cmp, rootPos=0, heapEnd=-1) {
-    if (heapEnd < 0)
-        heapEnd -= arr.length*Math.floor(heapEnd/arr.length);
-    for (let last=heapEnd; last > rootPos; --last) {
-        swap(arr, rootPos, last);
-        downheap(arr, rootPos, cmp, rootPos, last-1);
-    }
-}
-
-var swap = function(arr, i, j) {
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-}
-
-/*
- * https://michaelha-d.dev.oati.local:8080/ui/microgrid/resources/configurations/Resources
- */
