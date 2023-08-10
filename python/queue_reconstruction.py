@@ -9,10 +9,21 @@ from typing import List
 class Solution:
 
     def reconstructQueue(self, people: List[List[int]]) -> List[List[int]]:
+        """
+        79.25 %ile runtime
+        90.86 %ile memory
 
-        def swap(arr, i, j):
+        The fact that this solution is an in-place sort is what makes it so memory-efficient, but the implementation is much more complex than it needs to be as a result.
+        """
+
+        def swap(arr, redir, i, j):
+            a, b = redir.setdefault(i, [i, i])
+            c, d = redir.setdefault(j, [j, j])
             arr[i], arr[j] = arr[j], arr[i]
-            redir[i] =
+            redir[b][0] = j
+            redir[d][0] = i
+            redir[i][1] = d
+            redir[j][1] = b
 
         idx = list(range(len(people)))
         redir = {}
@@ -24,6 +35,7 @@ class Solution:
             ht, rk = people[f]
             print(
                 f"prev = {prev}, ht = {ht}, rd = {rk}, degeneracy = {degeneracy}")
+            print(f"redir = {redir}")
             if ht == prev:
                 rk -= degeneracy
                 degeneracy += 1
@@ -36,12 +48,6 @@ class Solution:
             print(f"idx = {idx}")
             # print(f"idx[people[{f}][1]] = {idx[people[f][1]]}")
             # print("------------------")
-            swap(people, f, j := idx.pop(rk))
+            swap(people, redir, f, j := idx.pop(rk))
             print(f"f = {f}, i = {i}, j = {j}, b = {b}")
-            print(redir)
-            redir[j] = [f, i]
-            redir[i] = [j, b]
-            redir[f][1] = j
-            redir[b][0] =
-            print(redir)
         return people
