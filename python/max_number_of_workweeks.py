@@ -9,21 +9,31 @@ Once all the milestones of all the projects are finished, or if the only milesto
 
 Return the maximum number of weeks you would be able to work on the projects without violating the rules mentioned above.
 """
+import heapq
 
 class Solution:
-    def numberOfWeeks(self, milestones: List[int]) -> int:
-        if len(milestones) == 1:
-            return 1
-        S = sum(milestones)
+    def numberOfWeeks(self, milestones):
+        """
+        83.19 %ile runtime
+        17.65 %ile memory
+        """
+        S, M = sum(milestones), max(milestones)
+        if 2*M > S:
+            return 2*(S-M) + 1
+        else:
+            return S
+
+    def numberOfWeeksGreedy(self, milestones: List[int]) -> int:
+        """
+        The most obvious greedy approach.  It's instructive to think about why this fails.
+        """
+        if len(milestones) == 0:
+            return 0
+        q = [-x for x in sorted(milestones, reverse=True)]
         tot = 0
-        while len(milestones) > 0:
-            M = milestones.pop() - 1
-            tot += 1
-            while M > 0 and len(milestones) > 0:
-                if M >= milestones[-1]:
-                    tot += 2*milestones[-1]
-                    M -= milestones.pop()
-                else:
-                    tot += 2*M
-                    M = milestones.pop() - M
-        return tot
+        while len(q) > 1:
+            M1, M2 = heapq.heappop(q), heapq.heappop(q)
+            tot -= 2*M2
+            if M1 < M2:
+                heapq.heappush(q, M1 - M2)
+        return tot + len(q)
