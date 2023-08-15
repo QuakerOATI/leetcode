@@ -16,30 +16,43 @@ var minimumMountainRemovals = function(nums) {
     if (nums.length < 4) {
         return 0;
     }
-    let best = Infinity;
-    let sortedLeft = [[0, 0]], sortedRight = [[0, 0]];
+    let sortedLeft = [{i: 0, ht: 0}];
+    let sortedRight = [{i: nums.length-1, ht: 0}];
+    let hts = Array(nums.length).fill(0);
     for (let i = 1; i < nums.length-1; ++i) {
-        let il = bisectLeft(sortedLeft, [i, 0], (x, y) => nums[x[0]] - nums[y[0]]);
-        sortedLeft.push([i, i - il]);
-        let ir = bisectLeft(sortedRight, [i, 0], 
-            (x, y) => nums[nums.length-x[0]-1] - nums[nums.length-y[0]-1]);
-        sortedRight.push([i, i - ir]);
-        if (i >= nums.length/2) {
-            best = Math.min(best, sortedLeft[i][1] + sortedRight[nums.length-i-1][1],
-                sortedLeft[nums.length-i-1][1] + sortedRight[i][1]);
-        }
+        console.group(`ITERATION: ${i}`);
+        let left = {i}, right = {i: nums.length-i-1};
+        let jl = bisectLeft(sortedLeft, left, (x, y) => nums[x.i] - nums[y.i]);
+        let jr = bisectLeft(sortedRight, right, (x, y) => nums[x.i] - nums[y.i]);
+        left.ht = jl ? sortedLeft[jl-1].ht + 1 : 0;
+        right.ht = jr ? sortedRight[jr-1].ht + 1 : 0;
+        hts[i] += left.ht;
+        hts[right.i] += right.ht;
+        sortedLeft.splice(jl, 0, left);
+        sortedRight.splice(jr, 0, right);
+        console.log(`nums[i] = ${nums[i]}, nums[ir] = ${nums[right.i]}`);
+        console.log(`jl = ${jl}, jr = ${jr}`);
+        console.table(sortedLeft.map(x => `{i: ${x.i}, ht: ${x.ht}, nums[i]: ${nums[x.i]}}`));
+        console.table(sortedRight.map(x => `{i: ${x.i}, ht: ${x.ht}, nums[i]: ${nums[x.i]}}`));
+        console.table(hts);
+        console.groupEnd();
     }
-    return best;
+    console.table(hts);
+    return nums.length - Math.max(...hts) - 2;
 };
 
 var bisectLeft = function(nums, x, cmp) {
+    if (nums.length === 0)
+        return 0;
+    else if (nums.length === 1)
+        return cmp(x, nums[0]) > 0 ? 1 : 0;
     let l = 0, r = nums.length - 1;
     while (r > l) {
-        let m = Math.floor((l+r)/2);
+        let m = Math.ceil((l+r)/2);
         if (cmp(x, nums[m]) <= 0)
             r = m;
         else
             l = m + 1;
     }
     return l;
-}
+};
