@@ -28,8 +28,14 @@ var minimumMountainRemovals = function(nums) {
         right.ht = jr ? sortedRight[jr-1].ht + 1 : 0;
         hts[i] += left.ht;
         hts[right.i] += right.ht;
-        sortedLeft.splice(jl, 0, left);
-        sortedRight.splice(jr, 0, right);
+        if (jl < sortedLeft.length && nums[i] === nums[sortedLeft[jl].i])
+            sortedLeft[jl] = left;
+        else
+            sortedLeft.splice(jl, 0, left);
+        if (jr < sortedRight.length && nums[right.i] === nums[sortedRight[jr].i])
+            sortedRight[jr] = right;
+        else
+            sortedRight.splice(jr, 0, right);
         console.log(`nums[i] = ${nums[i]}, nums[ir] = ${nums[right.i]}`);
         console.log(`jl = ${jl}, jr = ${jr}`);
         console.table(sortedLeft.map(x => `{i: ${x.i}, ht: ${x.ht}, nums[i]: ${nums[x.i]}}`));
@@ -38,21 +44,25 @@ var minimumMountainRemovals = function(nums) {
         console.groupEnd();
     }
     console.table(hts);
-    return nums.length - Math.max(...hts) - 2;
+    return nums.length - Math.max(...hts) - 1;
 };
+
 
 var bisectLeft = function(nums, x, cmp) {
     if (nums.length === 0)
         return 0;
     else if (nums.length === 1)
         return cmp(x, nums[0]) > 0 ? 1 : 0;
+    if (cmp(x, nums.at(-1)) > 0)
+        return nums.length;
     let l = 0, r = nums.length - 1;
     while (r > l) {
-        let m = Math.ceil((l+r)/2);
-        if (cmp(x, nums[m]) <= 0)
-            r = m;
-        else
+        let m = Math.floor((l+r)/2);
+        if (cmp(x, nums[m]) > 0)
             l = m + 1;
+        else
+            r = m;
     }
     return l;
 };
+
