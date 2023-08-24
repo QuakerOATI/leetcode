@@ -13,14 +13,30 @@ var lengthOfLIS = function(nums) {
     let best = 1;
     let dp = [];
     for (let i = 0; i < nums.length; ++i) {
-        let j = bisect_left(dp, nums[i], (n, p) => n - p);
-        if (j >= i || nums[i] !== dp[j]) {
-            dp.splice(j, 0, nums[i]);
+        let j = bisect_left(dp, nums[i], (n, p) => n - p[0]);
+        if (j === 0) {
+            dp.unshift([nums[i], 1]);
+        } else {
+            best = Math.max(dp[j-1][1] + 1, best);
+            if (j >= i) {
+                dp.push([nums[i], best]);
+            } else if (nums[i] === dp[j][0]) {
+                dp[j][1] = Math.max(dp[j][1], best);
+            } else {
+                dp.splice(j, 0, [nums[i], best]);
+            }
         }
-        best = Math.max(best, j + 1);
     }
     return best;
 };
+
+var lengthOfLIS = function(nums) {
+    if (nums.length === 0)
+        return 0;
+    let best = 1;
+    let dp = 0;
+    for (let i = 0; i < nums.length; ++i) {
+        let j = bisect_left(dp, nums[i], 
 
 var bisect_left = function(vals, n, cmp) {
     if (vals.length === 0)
