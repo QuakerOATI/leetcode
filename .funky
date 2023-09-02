@@ -1,0 +1,1 @@
+{"solve": "for problem in $@; do\n\tfind . -name \"${problem}*\" -type f | xargs -I{} git add {} &&\n\t\tgit commit -m \"Solve $problem\"\ndone"}
